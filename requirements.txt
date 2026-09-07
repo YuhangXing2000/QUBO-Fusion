@@ -1,0 +1,32 @@
+# Core data & modeling
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+seaborn
+
+# Survival analysis
+lifelines
+
+# Deep learning (BP-Cox)
+torch
+
+# SurvivalML mrna.rda reading
+pyreadr
+rdata
+
+# Data download (src/download_data.py)
+synapseclient
+synapseutils
+
+# Excel export in brca_validation.py
+openpyxl
+
+# ------------------------------------------------------------------
+# Optional (auto-fallback if missing):
+#   scikit-survival  -> RSF model (falls back to RandomForestRegressor)
+#   kaiwu            -> QUBO simulated-annealing solver (falls back to local SA)
+# Install with:
+#   pip install scikit-survival kaiwu
+# ------------------------------------------------------------------
