@@ -113,46 +113,48 @@ python main.py --mode=main --output result/main_test
 
 #### 1.1 QUBO 问题的一般形式
 
-QUBO 是量子退火计算的标准问题形式，一个 QUBO 问题可以表述为最小化如下二次目标函数（二值变量 $x_i \in \{0,1\}$，$x_i=1$ 表示选择第 $i$ 个基因）：
+QUBO 是量子退火计算的标准问题形式，一个 QUBO 问题可以表述为最小化如下二次目标函数（二值变量 `x_i ∈ {0,1}`，`x_i = 1` 表示选择第 `i` 个基因）：
 
 $$E(x) = x^T Q x = \sum_{i=1}^{n} Q_{ii}\, x_i + \sum_{i<j} Q_{ij}\, x_i x_j \tag{1}$$
 
-其中 $Q_{ii}$ 为对角项（一元偏好系数），$Q_{ij}$ 为交叉项（二元交互系数）。QUBO 虽是量子退火的标准形式，本研究全程使用经典模拟退火求解器，不涉及量子硬件实现。
+其中 `Q_ii` 为对角项（一元偏好系数），`Q_ij` 为交叉项（二元交互系数）。QUBO 虽是量子退火的标准形式，本研究全程使用经典模拟退火求解器，不涉及量子硬件实现。
 
 #### 1.2 单变量 Cox 综合评分
 
-对候选基因进行单变量 Cox 回归打分。与传统的仅使用 p 值不同，采用综合评分策略，同时考虑三个维度——Cox 回归的 $|z|$ 统计量、单基因 C-index 和基因表达方差：
+对候选基因进行单变量 Cox 回归打分。与传统的仅使用 p 值不同，采用综合评分策略，同时考虑三个维度——Cox 回归的 `|z|` 统计量、单基因 C-index 和基因表达方差：
 
 $$s_i = f\big(\text{rank}(|z_i|),\; \text{rank}(c_i),\; \text{rank}(v_i)\big) \tag{2}$$
 
-其中 $\text{rank}(\cdot)$ 表示基因 $i$ 在候选基因集合中的百分位排名，$z_i$ 为单变量 Cox 回归的 z 统计量，$c_i$ 为单基因 C-index，$v_i$ 为基因表达方差（综合函数的具体形式见论文方法（一））。该策略中：$|z|$ 统计量反映基因与生存的统计关联强度，C-index 衡量基因判别能力，方差确保所选基因具有足够的表达变异度。
+其中 `rank(·)` 表示基因 `i` 在候选基因集合中的百分位排名，`z_i` 为单变量 Cox 回归的 z 统计量，`c_i` 为单基因 C-index，`v_i` 为基因表达方差（综合函数的具体形式见论文方法（一））。该策略中：`|z|` 统计量反映基因与生存的统计关联强度，C-index 衡量基因判别能力，方差确保所选基因具有足够的表达变异度。
 
 #### 1.3 QUBO 矩阵构造
 
-基于综合评分 $s_i$ 与基因间 Pearson 相关系数 $\rho(g_i, g_j)$，构造 QUBO 矩阵的对角项与交叉项：
+基于综合评分 `s_i` 与基因间 Pearson 相关系数 `ρ(g_i, g_j)`，构造 QUBO 矩阵的对角项与交叉项：
 
 $$Q_{ii} = -\, w_{\text{rel}} \cdot s_i \tag{3a}$$
 
 $$Q_{ij} = w_{\text{red}} \cdot \rho^2(g_i, g_j) \qquad (i \neq j) \tag{3b}$$
 
-$$\sum_{i=1}^{n} x_i \approx k \qquad \text{（基数约束项，权重 } w_{\text{card}}\text{）} \tag{3c}$$
+$$\sum_{i=1}^{n} x_i \approx k \tag{3c}$$
 
-对角项的负号确保高评分基因被优先选中；交叉项的正相关系数惩罚冗余选择；基数约束项使选中基因数接近目标值 $k$。超参数默认 $w_{\text{rel}}=1.0$，$w_{\text{red}}=0.35$，$w_{\text{card}}=5.0$，$k=20$（可在 `params.py` 调整）。
+基数约束项以权重 `w_card = 5.0` 加入目标函数，使选中基因数接近目标值 `k`。
+
+对角项的负号确保高评分基因被优先选中；交叉项的正相关系数惩罚冗余选择；基数约束项使选中基因数接近目标值 `k`。超参数默认 `w_rel = 1.0`，`w_red = 0.35`，`w_card = 5.0`，`k = 20`（可在 `params.py` 调整）。
 
 #### 1.4 两阶段候选集与模拟退火求解
 
-直接在全基因组（$n > 10{,}000$）上构建 QUBO 矩阵计算量过大，采用两阶段策略：先按综合评分排序保留前 80 个候选基因（`MAX_QUBO_CANDIDATE_GENES`），再在该子集上构建 $80 \times 80$ 的 QUBO 矩阵。求解采用经典模拟退火：
+直接在全基因组（`n > 10,000`）上构建 QUBO 矩阵计算量过大，采用两阶段策略：先按综合评分排序保留前 80 个候选基因（`MAX_QUBO_CANDIDATE_GENES`），再在该子集上构建 `80 × 80` 的 QUBO 矩阵。求解采用经典模拟退火：
 
 $$T_t = T_0 \left(\frac{T_1}{T_0}\right)^{t/N}, \qquad T_0 = 5.0,\; T_1 = 0.01,\; N = 4000 \tag{4}$$
 
-即温度从 $T_0=5.0$ 指数退火至 $T_1=0.01$，共 $N=4000$ 步；若安装了 Kaiwu SDK（`USE_KAIWU_FIRST=True`），可优先接入量子退火求解器。
+即温度从 `T_0 = 5.0` 指数退火至 `T_1 = 0.01`，共 `N = 4000` 步；若安装了 Kaiwu SDK（`USE_KAIWU_FIRST=True`），可优先接入量子退火求解器。
 
 #### 1.5 两种 QUBO 变体
 
 | 变体 | 冗余惩罚 | 目标 |
 |---|---|---|
-| **QUBO_Full** | $w_{\text{red}}=0.35$（含） | 选出 20 个兼顾预测能力与信息多样性的基因 |
-| **QUBO_NoRedundancy** | $w_{\text{red}}=0.0$（不含） | 选出 20 个以预后信号强度为主要标准的基因 |
+| **QUBO_Full** | `w_red = 0.35`（含） | 选出 20 个兼顾预测能力与信息多样性的基因 |
+| **QUBO_NoRedundancy** | `w_red = 0.0`（不含） | 选出 20 个以预后信号强度为主要标准的基因 |
 
 ### 2. RSF 随机生存森林
 
@@ -160,15 +162,15 @@ $$T_t = T_0 \left(\frac{T_1}{T_0}\right)^{t/N}, \qquad T_0 = 5.0,\; T_1 = 0.01,\
 
 $$\hat{H}(t \mid x) = \frac{1}{B} \sum_{b=1}^{B} H_b(t \mid x) \tag{5}$$
 
-其中 $B$ 为树的数量，$H_b(t|x)$ 为第 $b$ 棵生存树的累积风险函数（Nelson–Aalen 估计）。RSF 无需假设比例风险条件，能自动建模非线性效应与高阶交互。超参通过 3 折 CV 从 `RSF_PARAM_GRID` 选择（树数 80/120/150，最大深度 8/10/None，最小叶节点样本 5/8）；sksurv 缺失时自动回退随机森林回归 + 生存风险映射（`FORCE_RF_FALLBACK=True`）。
+其中 `B` 为树的数量，`H_b(t|x)` 为第 `b` 棵生存树的累积风险函数（Nelson–Aalen 估计）。RSF 无需假设比例风险条件，能自动建模非线性效应与高阶交互。超参通过 3 折 CV 从 `RSF_PARAM_GRID` 选择（树数 80/120/150，最大深度 8/10/None，最小叶节点样本 5/8）；sksurv 缺失时自动回退随机森林回归 + 生存风险映射（`FORCE_RF_FALLBACK=True`）。
 
 ### 3. BP-Cox 深度学习 Cox 模型
 
-BP-Cox 将反向传播神经网络与 Cox 比例风险框架相结合：网络编码器 $\phi(x; \theta)$（输入 → hidden_dim → hidden_dim/2 → 1，LayerNorm + ReLU + Dropout，p = 0.20~0.25）提取高阶非线性特征，Cox 层输出风险对数 $\eta_i = \phi(x_i; \theta)^T \beta$。训练采用 Cox **负对数偏似然损失**：
+BP-Cox 将反向传播神经网络与 Cox 比例风险框架相结合：网络编码器 `φ(x; θ)`（输入 → hidden_dim → hidden_dim/2 → 1，LayerNorm + ReLU + Dropout，p = 0.20~0.25）提取高阶非线性特征，Cox 层输出风险对数 `η_i = φ(x_i; θ)ᵀ β`。训练采用 Cox **负对数偏似然损失**：
 
 $$L(\theta) = - \sum_{i \in D} \left[ \eta_i - \log \sum_{j \in R(t_i)} \exp(\eta_j) \right] \tag{6}$$
 
-其中 $D$ 为事件集合，$R(t_i)$ 为 $t_i$ 时刻的风险集。优化采用 Adam（初始学习率 $1\times10^{-3}$，权重衰减 $1\times10^{-4}$），训练 100~120 个 epoch，早停 patience=25，取训练过程中损失最低的 checkpoint。
+其中 `D` 为事件集合，`R(t_i)` 为 `t_i` 时刻的风险集。优化采用 Adam（初始学习率 `1×10⁻³`，权重衰减 `1×10⁻⁴`），训练 100~120 个 epoch，早停 patience=25，取训练过程中损失最低的 checkpoint。
 
 ### 4. RSF-BP-Cox 加权融合
 
@@ -178,13 +180,13 @@ $$z_{\text{RSF},i} = \frac{r_{\text{RSF},i} - \mu_{\text{RSF}}}{\sigma_{\text{RS
 
 $$\hat{r}_i = w \cdot z_{\text{RSF},i} + (1 - w) \cdot z_{\text{BP},i}, \qquad w \in [0, 1] \tag{7b}$$
 
-其中 $\mu$、$\sigma$ 在训练集上估计，确保两个模型的评分在同一量纲上融合。
+其中 `μ`、`σ` 在训练集上估计，确保两个模型的评分在同一量纲上融合。
 
-**融合权重选择算法**：权重 $w$ 通过 3 折交叉验证在验证集上确定——在 21 点网格 $\mathcal{W} = \{0, 0.05, 0.10, \dots, 1.0\}$ 上搜索，以验证集 C-index 均值为选择标准：
+**融合权重选择算法**：权重 `w` 通过 3 折交叉验证在验证集上确定——在 21 点网格 `W = {0, 0.05, 0.10, …, 1.0}` 上搜索，以验证集 C-index 均值为选择标准：
 
 $$w^{*} = \arg\max_{w \in \mathcal{W}} \; \frac{1}{K} \sum_{k=1}^{K} C_k(w) \tag{8}$$
 
-其中 $K$ 为 CV 折数，$C_k(w)$ 为第 $k$ 折验证集上权重 $w$ 对应的 C-index。最终融合模型在完整训练集上重新训练，并在独立测试集上评估。
+其中 `K` 为 CV 折数，`C_k(w)` 为第 `k` 折验证集上权重 `w` 对应的 C-index。最终融合模型在完整训练集上重新训练，并在独立测试集上评估。
 
 ### 5. 评估指标
 
@@ -192,11 +194,11 @@ $$w^{*} = \arg\max_{w \in \mathcal{W}} \; \frac{1}{K} \sum_{k=1}^{K} C_k(w) \tag
 
 $$C = \frac{\displaystyle \sum_{i:\,\delta_i = 1} \sum_{j:\, T_j > T_i} \mathbb{I}[\hat{r}_i > \hat{r}_j]}{\displaystyle \sum_{i:\,\delta_i = 1} \sum_{j:\, T_j > T_i} 1} \tag{9}$$
 
-其中 $T_i$ 为观察时间，$\delta_i$ 为事件指示符（1=事件，0=删失），$\hat{r}$ 为预测风险评分。C-index ∈ [0,1]，0.5 表示随机预测，1 表示完美预测。
+其中 `T_i` 为观察时间，`δ_i` 为事件指示符（1=事件，0=删失），`r̂` 为预测风险评分。C-index ∈ [0,1]，0.5 表示随机预测，1 表示完美预测。
 
 #### 5.2 基因冗余度
 
-QUBO 所选基因集合 $S$ 的内部冗余度定义为基因两两 Pearson 相关系数绝对值的平均：
+QUBO 所选基因集合 `S` 的内部冗余度定义为基因两两 Pearson 相关系数绝对值的平均：
 
 $$\text{Redundancy}(S) = \frac{1}{\binom{k}{2}} \sum_{i < j} \big| \rho(g_i, g_j) \big| \tag{10}$$
 
