@@ -1,4 +1,4 @@
-﻿# 【QUBO-Fusion】课题
+# 【QUBO-Fusion】课题
 
 ## 课题简介
 
@@ -248,8 +248,8 @@ for multi-cancer prognostic biomarker discovery.
 
 ## 作者信息
 
-- 作者姓名：（待填写）
-- 联系方式：（待填写）
+- 作者姓名：邢宇航
+- 联系方式：2794194931@qq.com
 
 ## License
 
